@@ -48,6 +48,7 @@ class GameScreenState extends State<GameScreen> {
   Timer? _catcherTimer; // Temporizador para el estado de atrapar
 
   bool _isGameOver = false;
+  bool _stop = false;
   int _score = 0;
   int _level = 1;
 
@@ -60,8 +61,10 @@ class GameScreenState extends State<GameScreen> {
 
   // Variables para el contador
   int _countdown = 3; // Contador inicial en segundos
+  int _countDelay = 3; // Contador delay en segundos
   bool _isCountingDown = true; // Indica si el contador está activo
   Timer? _countdownTimer; // Temporizador para el contador
+  Timer? _delayGame; // Temporizador para el delay
 
   // Factor de escala para la imagen mano_abierta.png
   final double _openHandScale = 1.2; // Ajusta este valor según sea necesario
@@ -106,6 +109,7 @@ class GameScreenState extends State<GameScreen> {
       _fallingObjectWidth = 20.0;
       _countdown = 3;
       _isCountingDown = true;
+      _stop = false;
     });
 
     // Iniciar el contador
@@ -117,10 +121,10 @@ class GameScreenState extends State<GameScreen> {
         setState(() {
           // Aumentar la velocidad de caída con cada nivel
           double fallingSpeed = 20.0 + (_level - 1) * 0.5;
-          _fallingObjectY += fallingSpeed;
+          !_stop ? _fallingObjectY += fallingSpeed : null;
 
           // Verificar colisión
-          if (_checkCollision()) {
+          if (_checkCollision() && !_stop) {
             _score++;
             // Incrementar nivel cada 5 puntos
             if (_score % 5 == 0) {
@@ -129,7 +133,7 @@ class GameScreenState extends State<GameScreen> {
               _fallingObjectWidth =
                   (_fallingObjectWidth * 0.9).clamp(30.0, _screenWidth);
             }
-            _resetFallingObject();
+            _delay();
           }
 
           // Verificar si el objeto ha caído fuera de la pantalla
@@ -141,6 +145,26 @@ class GameScreenState extends State<GameScreen> {
           }
         });
       }
+    });
+  }
+
+  void _delay() {
+    _delayGame?.cancel();
+    _countDelay = 3;
+    _stop = true;
+    _delayGame = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_countDelay > 1) {
+        setState(() {
+          _countDelay--;
+        });
+      } else {
+        setState(() {
+          _countDelay = 0;
+        });
+        _resetFallingObject();
+        _delayGame?.cancel();
+      }
+      print(_countDelay);
     });
   }
 
@@ -166,6 +190,7 @@ class GameScreenState extends State<GameScreen> {
 
   void _resetFallingObject() {
     setState(() {
+      _stop = false;
       _isCountingDown = true;
       _countdown = 3;
       _fallingObjectY = 0.0;
@@ -352,6 +377,17 @@ class GameScreenState extends State<GameScreen> {
               ),
             ),
           ),
+          if (_stop)
+            const Center(
+              child: Text(
+                'Win',
+                style: TextStyle(
+                  color: Color.fromARGB(237, 255, 201, 52),
+                  fontSize: 70,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           // Contador
           if (_isCountingDown)
             Center(
