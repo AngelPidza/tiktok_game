@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'dart:async';
+import 'dart:math';
 
 // Definición de los estados del catcher
 enum CatcherState { ready, catching, locked }
@@ -30,6 +31,7 @@ class GameScreenState extends State<GameScreen> {
   // Posición del objeto que cae
   double _fallingObjectX = 0.0;
   double _fallingObjectY = 0.0;
+  double _speed = 0.0;
 
   // Tamaño del objeto que cae
   double _fallingObjectWidth = 20.0;
@@ -68,6 +70,8 @@ class GameScreenState extends State<GameScreen> {
 
   // Factor de escala para la imagen mano_abierta.png
   final double _openHandScale = 1.2; // Ajusta este valor según sea necesario
+
+  String _messageWin = 'WIN';
 
   @override
   void initState() {
@@ -110,6 +114,8 @@ class GameScreenState extends State<GameScreen> {
       _countdown = 3;
       _isCountingDown = true;
       _stop = false;
+      _speed = 0.0;
+      _messageWin = 'WIN';
     });
 
     // Iniciar el contador
@@ -120,19 +126,15 @@ class GameScreenState extends State<GameScreen> {
       if (!_isCountingDown && !_isGameOver) {
         setState(() {
           // Aumentar la velocidad de caída con cada nivel
-          double fallingSpeed = 20.0 + (_level - 1) * 0.5;
+          double fallingSpeed = 20.0 + (_level - 1) * 0.5 + _speed;
           !_stop ? _fallingObjectY += fallingSpeed : null;
 
           // Verificar colisión
           if (_checkCollision() && !_stop) {
+            // Aumentar los puntos2
             _score++;
-            // Incrementar nivel cada 5 puntos
-            if (_score % 5 == 0) {
-              _level++;
-              // Reducir el tamaño del objeto que cae
-              _fallingObjectWidth =
-                  (_fallingObjectWidth * 0.9).clamp(30.0, _screenWidth);
-            }
+            // Aumentar la velocidad de cañada con cada punto
+            _speed += 2.0;
             _delay();
           }
 
@@ -160,11 +162,21 @@ class GameScreenState extends State<GameScreen> {
       } else {
         setState(() {
           _countDelay = 0;
+          // Cambiar el mensaje
+          _score == 8 ? _messageWin = '!WIN THIS GAME!' : null;
+          // Incrementar nivel cada 5 puntos
+          if (_score % 3 == 0) {
+            _level++;
+            // Reducir el tamaño del objeto que cae
+            _fallingObjectHeight = (_fallingObjectHeight * 0.75);
+          }
         });
         _resetFallingObject();
         _delayGame?.cancel();
       }
-      print(_countDelay);
+      if (kDebugMode) {
+        print(_countDelay);
+      }
     });
   }
 
@@ -201,25 +213,23 @@ class GameScreenState extends State<GameScreen> {
   }
 
   bool _checkCollision() {
-    // Coordenadas del objeto que cae
-    double fallingLeft = _fallingObjectX;
-    double fallingRight = _fallingObjectX + _fallingObjectWidth;
-    double fallingTop = _fallingObjectY;
-    double fallingBottom = _fallingObjectY + _fallingObjectHeight;
+    // Centros del objeto que cae
+    double fallingCenterX = _fallingObjectX + _fallingObjectWidth / 2;
+    double fallingCenterY = _fallingObjectY + _fallingObjectHeight / 2;
+    double fallingRadius = min(_fallingObjectWidth, _fallingObjectHeight) / 2;
 
-    // Coordenadas del catcher
-    double catcherLeft = _catcherX;
-    double catcherRight = _catcherX + _catcherWidth;
-    double catcherTop = _catcherY;
-    double catcherBottom = _catcherY + _catcherHeight;
+    // Centros del catcher
+    double catcherCenterX = _catcherX + _catcherWidth / 2;
+    double catcherCenterY = _catcherY + _catcherHeight / 2;
+    double catcherRadius = min(_catcherWidth, _catcherHeight) / 2;
 
-    // Verificar si hay intersección
-    bool overlapX = fallingRight >= catcherLeft && fallingLeft <= catcherRight;
-    bool overlapY = fallingBottom >= catcherTop && fallingTop <= catcherBottom;
+    // Calcular la distancia entre los centros
+    double distance = sqrt(pow(fallingCenterX - catcherCenterX, 2) +
+        pow(fallingCenterY - catcherCenterY, 2));
 
-    // Solo cuenta la colisión si el catcher está en estado de atrapar
-    bool collision =
-        overlapX && overlapY && _catcherState == CatcherState.catching;
+    // Verificar si la distancia es menor o igual a la suma de los radios
+    bool collision = distance <= (fallingRadius + catcherRadius) &&
+        _catcherState == CatcherState.catching;
 
     if (collision) {
       if (kDebugMode) {
@@ -283,52 +293,67 @@ class GameScreenState extends State<GameScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Objeto que cae (Rectángulo)
-          Positioned(
-            left: _fallingObjectX,
-            top: _fallingObjectY,
-            child: Container(
-              width: _fallingObjectWidth,
-              height: _fallingObjectHeight,
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(5),
-              ),
-            ),
-          ),
-          // Catcher (Objeto que atrapa)
-          Positioned(
-            left: _catcherX,
-            top: _catcherY,
+          // El Catcher (imagen de la mano) y el objeto que cae estarán en el mismo Stack
+          Positioned.fill(
             child: Stack(
               children: [
-                if (_catcherState == CatcherState.catching) ...[
-                  // Imagen de mano cerrada detrás del objeto que cae
-                  Image.asset(
-                    'assets/images/mano_cerrada.png',
-                    width: _catcherWidth,
-                    height: _catcherHeight,
-                  ),
-                  // Imagen de mano cerrada capa delante del objeto que cae
-                  Image.asset(
-                    'assets/images/mano_cerrada_capa.png',
-                    width: _catcherWidth,
-                    height: _catcherHeight,
-                  ),
-                ] else
-                  // Imagen de mano abierta para estados normal y bloqueado
-                  Transform.scale(
-                    scale: _openHandScale,
+                // Imagen de mano cerrada detrás del objeto que cae y mano_cerrada_capa
+                if (_catcherState == CatcherState.catching || _stop)
+                  Positioned(
+                    left: _catcherX,
+                    top: _catcherY,
                     child: Image.asset(
-                      'assets/images/mano_abierta.png',
+                      'assets/images/mano_cerrada.png',
                       width: _catcherWidth,
                       height: _catcherHeight,
-                      colorBlendMode: BlendMode.srcATop,
+                    ),
+                  ),
+
+                // Objeto que cae (debe estar encima de mano_cerrada.png)
+                Positioned(
+                  left: _fallingObjectX,
+                  top: _fallingObjectY,
+                  child: Container(
+                    width: _fallingObjectWidth,
+                    height: _fallingObjectHeight,
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+
+                // Imagen de mano cerrada capa (delante del objeto que cae)
+                if (_catcherState == CatcherState.catching || _stop)
+                  Positioned(
+                    left: _catcherX,
+                    top: _catcherY,
+                    child: Image.asset(
+                      'assets/images/mano_cerrada_capa.png',
+                      width: _catcherWidth,
+                      height: _catcherHeight,
+                    ),
+                  ),
+
+                // Imagen de mano abierta para los estados "normal" y "locked"
+                if (_catcherState != CatcherState.catching && !_stop)
+                  Positioned(
+                    left: _catcherX,
+                    top: _catcherY,
+                    child: Transform.scale(
+                      scale: _openHandScale,
+                      child: Image.asset(
+                        'assets/images/mano_abierta.png',
+                        width: _catcherWidth,
+                        height: _catcherHeight,
+                        colorBlendMode: BlendMode.srcATop,
+                      ),
                     ),
                   ),
               ],
             ),
           ),
+
           // Puntuación y Nivel
           Positioned(
             left: 20,
@@ -356,6 +381,7 @@ class GameScreenState extends State<GameScreen> {
               ],
             ),
           ),
+
           // Indicador del Estado del Catcher
           Positioned(
             right: 20,
@@ -377,17 +403,20 @@ class GameScreenState extends State<GameScreen> {
               ),
             ),
           ),
+
+          // Mostrar "Win" si el objeto ha sido atrapado
           if (_stop)
-            const Center(
+            Center(
               child: Text(
-                'Win',
-                style: TextStyle(
+                _messageWin,
+                style: const TextStyle(
                   color: Color.fromARGB(237, 255, 201, 52),
-                  fontSize: 70,
+                  fontSize: 50,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
+
           // Contador
           if (_isCountingDown)
             Center(
@@ -400,6 +429,7 @@ class GameScreenState extends State<GameScreen> {
                 ),
               ),
             ),
+
           // Pantalla de Game Over
           if (_isGameOver)
             Center(
