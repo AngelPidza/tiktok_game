@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'dart:async';
@@ -35,8 +36,8 @@ class GameScreenState extends State<GameScreen> {
   double _fallingObjectHeight = 100.0;
 
   // Tamaño del catcher
-  final double _catcherWidth = 30.0;
-  final double _catcherHeight = 125.0;
+  final double _catcherWidth = 100.0;
+  final double _catcherHeight = 100.0;
 
   // Posición del catcher
   double _catcherX = 0.0;
@@ -61,6 +62,9 @@ class GameScreenState extends State<GameScreen> {
   int _countdown = 3; // Contador inicial en segundos
   bool _isCountingDown = true; // Indica si el contador está activo
   Timer? _countdownTimer; // Temporizador para el contador
+
+  // Factor de escala para la imagen mano_abierta.png
+  final double _openHandScale = 1.2; // Ajusta este valor según sea necesario
 
   @override
   void initState() {
@@ -108,7 +112,7 @@ class GameScreenState extends State<GameScreen> {
     _startCountdown();
 
     _timer?.cancel();
-    _timer = Timer.periodic(Duration(milliseconds: 16), (timer) {
+    _timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       if (!_isCountingDown && !_isGameOver) {
         setState(() {
           // Aumentar la velocidad de caída con cada nivel
@@ -145,7 +149,7 @@ class GameScreenState extends State<GameScreen> {
     _countdown = 3;
     _isCountingDown = true;
 
-    _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_countdown > 1) {
         setState(() {
           _countdown--;
@@ -193,7 +197,9 @@ class GameScreenState extends State<GameScreen> {
         overlapX && overlapY && _catcherState == CatcherState.catching;
 
     if (collision) {
-      print('¡Objeto atrapado!');
+      if (kDebugMode) {
+        print('¡Objeto atrapado!');
+      }
     }
 
     return collision;
@@ -212,7 +218,7 @@ class GameScreenState extends State<GameScreen> {
 
         // Iniciar temporizador para desactivar el estado después de 1 segundo
         _catcherTimer?.cancel();
-        _catcherTimer = Timer(Duration(seconds: 1), () {
+        _catcherTimer = Timer(const Duration(seconds: 1), () {
           setState(() {
             _catcherState = CatcherState.locked;
           });
@@ -269,15 +275,33 @@ class GameScreenState extends State<GameScreen> {
           Positioned(
             left: _catcherX,
             top: _catcherY,
-            child: Container(
-              width: _catcherWidth,
-              height: _catcherHeight,
-              decoration: BoxDecoration(
-                color: _catcherState == CatcherState.catching
-                    ? Colors.green
-                    : Colors.blue,
-                borderRadius: BorderRadius.circular(10),
-              ),
+            child: Stack(
+              children: [
+                if (_catcherState == CatcherState.catching) ...[
+                  // Imagen de mano cerrada detrás del objeto que cae
+                  Image.asset(
+                    'assets/images/mano_cerrada.png',
+                    width: _catcherWidth,
+                    height: _catcherHeight,
+                  ),
+                  // Imagen de mano cerrada capa delante del objeto que cae
+                  Image.asset(
+                    'assets/images/mano_cerrada_capa.png',
+                    width: _catcherWidth,
+                    height: _catcherHeight,
+                  ),
+                ] else
+                  // Imagen de mano abierta para estados normal y bloqueado
+                  Transform.scale(
+                    scale: _openHandScale,
+                    child: Image.asset(
+                      'assets/images/mano_abierta.png',
+                      width: _catcherWidth,
+                      height: _catcherHeight,
+                      colorBlendMode: BlendMode.srcATop,
+                    ),
+                  ),
+              ],
             ),
           ),
           // Puntuación y Nivel
@@ -368,12 +392,14 @@ class GameScreenState extends State<GameScreen> {
                     const SizedBox(height: 30),
                     ElevatedButton(
                       onPressed: _restartGame,
-                      child: Text('Reiniciar'),
                       style: ElevatedButton.styleFrom(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                        textStyle: TextStyle(fontSize: 20),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 30,
+                          vertical: 15,
+                        ),
+                        textStyle: const TextStyle(fontSize: 20),
                       ),
+                      child: const Text('Reiniciar'),
                     ),
                   ],
                 ),
