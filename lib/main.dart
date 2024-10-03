@@ -4,7 +4,6 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'dart:async';
 import 'dart:math';
 
-// Definición de los estados del catcher
 enum CatcherState { ready, catching, locked }
 
 void main() => runApp(const MyApp());
@@ -13,9 +12,14 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      title: 'Juego de Captura Mejorado',
-      home: GameScreen(),
+    return MaterialApp(
+      title: 'Juego de Captura Espacial',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+        fontFamily: 'Orbitron',
+      ),
+      home: const GameScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -27,7 +31,7 @@ class GameScreen extends StatefulWidget {
   GameScreenState createState() => GameScreenState();
 }
 
-class GameScreenState extends State<GameScreen> {
+class GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // Posición del objeto que cae
   double _fallingObjectX = 0.0;
   double _fallingObjectY = 0.0;
@@ -72,11 +76,21 @@ class GameScreenState extends State<GameScreen> {
   final double _openHandScale = 1.2; // Ajusta este valor según sea necesario
 
   String _messageWin = 'WIN';
+  late AnimationController _backgroundController;
+  late Animation<double> _backgroundAnimation;
 
   @override
   void initState() {
     super.initState();
     _listenToMagnetometer();
+
+    // Inicializar la animación del fondo
+    _backgroundController = AnimationController(
+      duration: const Duration(minutes: 2),
+      vsync: this,
+    )..repeat();
+    _backgroundAnimation =
+        Tween<double>(begin: 0, end: 1).animate(_backgroundController);
   }
 
   @override
@@ -290,188 +304,261 @@ class GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // El Catcher (imagen de la mano) y el objeto que cae estarán en el mismo Stack
-          Positioned.fill(
+      body: AnimatedBuilder(
+        animation: _backgroundAnimation,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  HSVColor.fromAHSV(
+                          1, _backgroundAnimation.value * 360, 0.8, 0.8)
+                      .toColor(),
+                  HSVColor.fromAHSV(
+                          1,
+                          (_backgroundAnimation.value * 360 + 180) % 360,
+                          0.8,
+                          0.8)
+                      .toColor(),
+                ],
+              ),
+            ),
             child: Stack(
               children: [
-                // Imagen de mano cerrada detrás del objeto que cae y mano_cerrada_capa
-                if (_catcherState == CatcherState.catching || _stop)
-                  Positioned(
-                    left: _catcherX,
-                    top: _catcherY,
-                    child: Image.asset(
-                      'assets/images/mano_cerrada.png',
-                      width: _catcherWidth,
-                      height: _catcherHeight,
-                    ),
-                  ),
+                // Estrellas de fondo
+                ...List.generate(50, (index) {
+                  return Positioned(
+                    left: Random().nextDouble() *
+                        MediaQuery.of(context).size.width,
+                    top: Random().nextDouble() *
+                        MediaQuery.of(context).size.height,
+                    child:
+                        const Icon(Icons.star, color: Colors.white, size: 10),
+                  );
+                }),
 
-                // Objeto que cae (debe estar encima de mano_cerrada.png)
-                Positioned(
-                  left: _fallingObjectX,
-                  top: _fallingObjectY,
-                  child: Container(
-                    width: _fallingObjectWidth,
-                    height: _fallingObjectHeight,
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                ),
-
-                // Imagen de mano cerrada capa (delante del objeto que cae)
-                if (_catcherState == CatcherState.catching || _stop)
-                  Positioned(
-                    left: _catcherX,
-                    top: _catcherY,
-                    child: Image.asset(
-                      'assets/images/mano_cerrada_capa.png',
-                      width: _catcherWidth,
-                      height: _catcherHeight,
-                    ),
-                  ),
-
-                // Imagen de mano abierta para los estados "normal" y "locked"
-                if (_catcherState != CatcherState.catching && !_stop)
-                  Positioned(
-                    left: _catcherX,
-                    top: _catcherY,
-                    child: Transform.scale(
-                      scale: _openHandScale,
-                      child: Image.asset(
-                        'assets/images/mano_abierta.png',
-                        width: _catcherWidth,
-                        height: _catcherHeight,
-                        colorBlendMode: BlendMode.srcATop,
+                // El Catcher (nave espacial) y el objeto que cae (meteorito)
+                Positioned.fill(
+                  child: Stack(
+                    children: [
+                      if (_catcherState == CatcherState.catching || _stop)
+                        Positioned(
+                          left: _catcherX,
+                          top: _catcherY,
+                          child: Image.asset(
+                            'assets/images/mano_cerrada.png',
+                            width: _catcherWidth,
+                            height: _catcherHeight,
+                          ),
+                        ),
+                      Positioned(
+                        left: _fallingObjectX,
+                        top: _fallingObjectY,
+                        child: Container(
+                          width: _fallingObjectWidth,
+                          height: _fallingObjectHeight,
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.yellowAccent.withOpacity(0.5),
+                                blurRadius: 10,
+                                spreadRadius: 5,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
+                      if (_catcherState == CatcherState.catching || _stop)
+                        Positioned(
+                          left: _catcherX,
+                          top: _catcherY,
+                          child: Image.asset(
+                            'assets/images/mano_cerrada_capa.png',
+                            width: _catcherWidth,
+                            height: _catcherHeight,
+                          ),
+                        ),
+                      if (_catcherState != CatcherState.catching && !_stop)
+                        Positioned(
+                          left: _catcherX,
+                          top: _catcherY,
+                          child: Transform.scale(
+                            scale: _openHandScale,
+                            child: Image.asset(
+                              'assets/images/mano_abierta.png',
+                              width: _catcherWidth,
+                              height: _catcherHeight,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Panel de información
+                Positioned(
+                  left: 20,
+                  top: 40,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Score: $_score',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Nivel: $_level',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-              ],
-            ),
-          ),
-
-          // Puntuación y Nivel
-          Positioned(
-            left: 20,
-            top: 40,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Score: $_score',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  'Nivel: $_level',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
 
-          // Indicador del Estado del Catcher
-          Positioned(
-            right: 20,
-            top: 40,
-            child: Text(
-              _catcherState == CatcherState.catching
-                  ? 'Atrapar'
-                  : _catcherState == CatcherState.locked
-                      ? 'Bloqueado'
-                      : 'Normal',
-              style: TextStyle(
-                color: _catcherState == CatcherState.catching
-                    ? Colors.green
-                    : _catcherState == CatcherState.locked
-                        ? Colors.orange
-                        : Colors.grey,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-
-          // Mostrar "Win" si el objeto ha sido atrapado
-          if (_stop)
-            Center(
-              child: Text(
-                _messageWin,
-                style: const TextStyle(
-                  color: Color.fromARGB(237, 255, 201, 52),
-                  fontSize: 50,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-
-          // Contador
-          if (_isCountingDown)
-            Center(
-              child: Text(
-                '$_countdown',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 80,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-
-          // Pantalla de Game Over
-          if (_isGameOver)
-            Center(
-              child: Container(
-                color: Colors.black54,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      '¡Game Over!',
+                // Indicador del Estado del Catcher
+                Positioned(
+                  right: 20,
+                  top: 40,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _catcherState == CatcherState.catching
+                          ? 'Capturando'
+                          : _catcherState == CatcherState.locked
+                              ? 'Cargando'
+                              : 'Listo',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
+                        color: _catcherState == CatcherState.catching
+                            ? Colors.green
+                            : _catcherState == CatcherState.locked
+                                ? Colors.orange
+                                : Colors.blue,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Tu Puntaje: $_score',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton(
-                      onPressed: _restartGame,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 15,
-                        ),
-                        textStyle: const TextStyle(fontSize: 20),
-                      ),
-                      child: const Text('Reiniciar'),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+
+                // Mostrar "Win" si el objeto ha sido atrapado
+                if (_stop)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _messageWin,
+                        style: const TextStyle(
+                          color: Color.fromARGB(237, 255, 201, 52),
+                          fontSize: 50,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Contador
+                if (_isCountingDown)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(30),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.8),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '$_countdown',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 80,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Pantalla de Game Over
+                if (_isGameOver)
+                  Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      padding: const EdgeInsets.all(30),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            '¡Game Over!',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 48,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Tu Puntaje: $_score',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+                          ElevatedButton(
+                            onPressed: _restartGame,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 30,
+                                vertical: 15,
+                              ),
+                              textStyle: const TextStyle(fontSize: 24),
+                              backgroundColor:
+                                  const Color.fromARGB(118, 101, 12, 10),
+                            ),
+                            child: const Text(
+                              'Reiniciar',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'Orbitron',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -482,6 +569,7 @@ class GameScreenState extends State<GameScreen> {
     _countdownTimer?.cancel();
     _catcherTimer?.cancel();
     _magnetometerSubscription?.cancel();
+    _backgroundController.dispose();
     super.dispose();
   }
 }
