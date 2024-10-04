@@ -115,6 +115,14 @@ class GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     }
   }
 
+  // Método para generar una posición X aleatoria para el objeto que cae
+  void _randomizeFallingObjectPosition() {
+    setState(() {
+      _fallingObjectX =
+          Random().nextDouble() * (_screenWidth - _fallingObjectWidth);
+    });
+  }
+
   void _startGame() {
     setState(() {
       _isGameOver = false;
@@ -222,7 +230,7 @@ class GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _fallingObjectY = 0.0;
       _fallingObjectX = (_screenWidth - _fallingObjectWidth) / 2;
     });
-
+    _randomizeFallingObjectPosition();
     _startCountdown();
   }
 
@@ -301,264 +309,281 @@ class GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _startGame();
   }
 
+  void _moveCatcher(Offset position) {
+    setState(() {
+      // Actualizar la posición X del catcher, manteniendo los límites de la pantalla
+      _catcherX = (position.dx - _catcherWidth / 2)
+          .clamp(0, _screenWidth - _catcherWidth);
+      // La posición Y del catcher no cambia
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AnimatedBuilder(
-        animation: _backgroundAnimation,
-        builder: (context, child) {
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  HSVColor.fromAHSV(
-                          1, _backgroundAnimation.value * 360, 0.8, 0.8)
-                      .toColor(),
-                  HSVColor.fromAHSV(
-                          1,
-                          (_backgroundAnimation.value * 360 + 180) % 360,
-                          0.8,
-                          0.8)
-                      .toColor(),
-                ],
+      body: GestureDetector(
+        onPanUpdate: (details) {
+          _moveCatcher(details.localPosition);
+        },
+        onTapDown: (details) {
+          _moveCatcher(details.localPosition);
+        },
+        child: AnimatedBuilder(
+          animation: _backgroundAnimation,
+          builder: (context, child) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    HSVColor.fromAHSV(
+                            1, _backgroundAnimation.value * 360, 0.8, 0.8)
+                        .toColor(),
+                    HSVColor.fromAHSV(
+                            1,
+                            (_backgroundAnimation.value * 360 + 180) % 360,
+                            0.8,
+                            0.8)
+                        .toColor(),
+                  ],
+                ),
               ),
-            ),
-            child: Stack(
-              children: [
-                // Estrellas de fondo
-                ...List.generate(50, (index) {
-                  return Positioned(
-                    left: Random().nextDouble() *
-                        MediaQuery.of(context).size.width,
-                    top: Random().nextDouble() *
-                        MediaQuery.of(context).size.height,
-                    child:
-                        const Icon(Icons.star, color: Colors.white, size: 10),
-                  );
-                }),
+              child: Stack(
+                children: [
+                  // Estrellas de fondo
+                  ...List.generate(50, (index) {
+                    return Positioned(
+                      left: Random().nextDouble() *
+                          MediaQuery.of(context).size.width,
+                      top: Random().nextDouble() *
+                          MediaQuery.of(context).size.height,
+                      child:
+                          const Icon(Icons.star, color: Colors.white, size: 10),
+                    );
+                  }),
 
-                // El Catcher (nave espacial) y el objeto que cae (meteorito)
-                Positioned.fill(
-                  child: Stack(
-                    children: [
-                      if (_catcherState == CatcherState.catching || _stop)
-                        Positioned(
-                          left: _catcherX,
-                          top: _catcherY,
-                          child: Image.asset(
-                            'assets/images/mano_cerrada.png',
-                            width: _catcherWidth,
-                            height: _catcherHeight,
-                          ),
-                        ),
-                      Positioned(
-                        left: _fallingObjectX,
-                        top: _fallingObjectY,
-                        child: Container(
-                          width: _fallingObjectWidth,
-                          height: _fallingObjectHeight,
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.yellowAccent.withOpacity(0.5),
-                                blurRadius: 10,
-                                spreadRadius: 5,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (_catcherState == CatcherState.catching || _stop)
-                        Positioned(
-                          left: _catcherX,
-                          top: _catcherY,
-                          child: Image.asset(
-                            'assets/images/mano_cerrada_capa.png',
-                            width: _catcherWidth,
-                            height: _catcherHeight,
-                          ),
-                        ),
-                      if (_catcherState != CatcherState.catching && !_stop)
-                        Positioned(
-                          left: _catcherX,
-                          top: _catcherY,
-                          child: Transform.scale(
-                            scale: _openHandScale,
+                  // El Catcher (nave espacial) y el objeto que cae (meteorito)
+                  Positioned.fill(
+                    child: Stack(
+                      children: [
+                        if (_catcherState == CatcherState.catching || _stop)
+                          Positioned(
+                            left: _catcherX,
+                            top: _catcherY,
                             child: Image.asset(
-                              'assets/images/mano_abierta.png',
+                              'assets/images/mano_cerrada.png',
                               width: _catcherWidth,
                               height: _catcherHeight,
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-
-                // Panel de información
-                Positioned(
-                  left: 20,
-                  top: 40,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Score: $_score',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                        Positioned(
+                          left: _fallingObjectX,
+                          top: _fallingObjectY,
+                          child: Container(
+                            width: _fallingObjectWidth,
+                            height: _fallingObjectHeight,
+                            decoration: BoxDecoration(
+                              color: Colors.orange,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.yellowAccent.withOpacity(0.5),
+                                  blurRadius: 10,
+                                  spreadRadius: 5,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Nivel: $_level',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                        if (_catcherState == CatcherState.catching || _stop)
+                          Positioned(
+                            left: _catcherX,
+                            top: _catcherY,
+                            child: Image.asset(
+                              'assets/images/mano_cerrada_capa.png',
+                              width: _catcherWidth,
+                              height: _catcherHeight,
+                            ),
                           ),
-                        ),
+                        if (_catcherState != CatcherState.catching && !_stop)
+                          Positioned(
+                            left: _catcherX,
+                            top: _catcherY,
+                            child: Transform.scale(
+                              scale: _openHandScale,
+                              child: Image.asset(
+                                'assets/images/mano_abierta.png',
+                                width: _catcherWidth,
+                                height: _catcherHeight,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                ),
 
-                // Indicador del Estado del Catcher
-                Positioned(
-                  right: 20,
-                  top: 40,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      _catcherState == CatcherState.catching
-                          ? 'Capturando'
-                          : _catcherState == CatcherState.locked
-                              ? 'Cargando'
-                              : 'Listo',
-                      style: TextStyle(
-                        color: _catcherState == CatcherState.catching
-                            ? Colors.green
-                            : _catcherState == CatcherState.locked
-                                ? Colors.orange
-                                : Colors.blue,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Mostrar "Win" si el objeto ha sido atrapado
-                if (_stop)
-                  Center(
+                  // Panel de información
+                  Positioned(
+                    left: 20,
+                    top: 40,
                     child: Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(20),
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        _messageWin,
-                        style: const TextStyle(
-                          color: Color.fromARGB(237, 255, 201, 52),
-                          fontSize: 50,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // Contador
-                if (_isCountingDown)
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(30),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.8),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '$_countdown',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 80,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // Pantalla de Game Over
-                if (_isGameOver)
-                  Center(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.all(30),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '¡Game Over!',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontSize: 48,
+                          Text(
+                            'Score: $_score',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 10),
                           Text(
-                            'Tu Puntaje: $_score',
+                            'Nivel: $_level',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 32,
-                            ),
-                          ),
-                          const SizedBox(height: 30),
-                          ElevatedButton(
-                            onPressed: _restartGame,
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 30,
-                                vertical: 15,
-                              ),
-                              textStyle: const TextStyle(fontSize: 24),
-                              backgroundColor:
-                                  const Color.fromARGB(118, 101, 12, 10),
-                            ),
-                            child: const Text(
-                              'Reiniciar',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontFamily: 'Orbitron',
-                              ),
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-              ],
-            ),
-          );
-        },
+
+                  // Indicador del Estado del Catcher
+                  Positioned(
+                    right: 20,
+                    top: 40,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _catcherState == CatcherState.catching
+                            ? 'Capturando'
+                            : _catcherState == CatcherState.locked
+                                ? 'Cargando'
+                                : 'Listo',
+                        style: TextStyle(
+                          color: _catcherState == CatcherState.catching
+                              ? Colors.green
+                              : _catcherState == CatcherState.locked
+                                  ? Colors.orange
+                                  : Colors.blue,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Mostrar "Win" si el objeto ha sido atrapado
+                  if (_stop)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _messageWin,
+                          style: const TextStyle(
+                            color: Color.fromARGB(237, 255, 201, 52),
+                            fontSize: 50,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Contador
+                  if (_isCountingDown)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(30),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$_countdown',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 80,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Pantalla de Game Over
+                  if (_isGameOver)
+                    Center(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.all(30),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              '¡Game Over!',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 48,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Tu Puntaje: $_score',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                              ),
+                            ),
+                            const SizedBox(height: 30),
+                            ElevatedButton(
+                              onPressed: _restartGame,
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 30,
+                                  vertical: 15,
+                                ),
+                                textStyle: const TextStyle(fontSize: 24),
+                                backgroundColor:
+                                    const Color.fromARGB(118, 101, 12, 10),
+                              ),
+                              child: const Text(
+                                'Reiniciar',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'Orbitron',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
